@@ -107,8 +107,9 @@ int main(int argc, char **argv) {
   else {
     fd = (int**)malloc(sizeof(int*) * pnum);
     for (int i = 0; i < pnum; i++) {
+      fd[i] = (int*)malloc(sizeof(int) * 2);
       if (pipe(fd[i]) == -1) {
-        printf("Pipe error");
+        printf("Pipe error\n");
         return 1;
       }
     }
@@ -122,7 +123,7 @@ int main(int argc, char **argv) {
       if (child_pid == 0) {
         // child process
         struct MinMax min_max;
-        printf("Pipe created");
+        printf("New pipe\n");
 
         // parallel somehow
         if (i != pnum - 1) {
@@ -149,7 +150,7 @@ int main(int argc, char **argv) {
   FILE *file_in;
   if (with_files) {
     fclose(file_out);
-    file_in = fopen("input.txt")
+    file_in = fopen("input.txt", "r");
   }
 
   while (active_child_processes > 0) {
