@@ -11,14 +11,23 @@
 #include <sys/wait.h>
 
 #include <getopt.h>
+#include <signal.h>
 
 #include "find_min_max.h"
 #include "utils.h"
+
+volatile sig_atomic_t timeout_expired = 0;
+
+void SIGALRM_handler(int sig) {
+    timeout_expired = 1;
+    printf("Timeout expired, sending SIGKILL to child processes.\n");
+}
 
 int main(int argc, char **argv) {
   int seed = -1;
   int array_size = -1;
   int pnum = -1;
+  int timeout = -1;
   bool with_files = false;
 
   while (true) {
@@ -28,6 +37,7 @@ int main(int argc, char **argv) {
                                       {"array_size", required_argument, 0, 0},
                                       {"pnum", required_argument, 0, 0},
                                       {"by_files", no_argument, 0, 'f'},
+                                      {"timeout", required_argument, 0, 0},
                                       {0, 0, 0, 0}};
 
     int option_index = 0;
@@ -62,6 +72,13 @@ int main(int argc, char **argv) {
           case 3:
             with_files = true;
             break;
+          case 4:
+            timeout = atoi(optarg);
+            if (timeout <= 0) {
+              printf("timeout must be > 0");
+              return 1;
+            }
+            break;
 
           defalut:
             printf("Index %d is out of options\n", option_index);
@@ -85,7 +102,7 @@ int main(int argc, char **argv) {
   }
 
   if (seed == -1 || array_size == -1 || pnum == -1) {
-    printf("Usage: %s --seed \"num\" --array_size \"num\" --pnum \"num\" \n",
+    printf("Usage: %s --seed \"num\" --array_size \"num\" --pnum \"num\" --timeout \"num\"\n",
            argv[0]);
     return 1;
   }
@@ -114,13 +131,29 @@ int main(int argc, char **argv) {
       }
     }
   }
-
+  pid_t *child_pids = malloc(sizeof(pid_t) * pnum);
+  if (timeout > 0) {
+    signal(SIGALRM, SIGALRM_handler);
+    struct itimerval timer;
+    timer.it_value.tv_sec = timeout / 1000;
+    timer.it_value.tv_usec = (timeout % 1000) * 1000;
+    timer.it_interval.tv_sec = 0;
+    timer.it_interval.tv_usec = 0;
+    setitimer(ITIMER_REAL, &timer, NULL);
+  }
   for (int i = 0; i < pnum; i++) {
+    if (timeout_expired) {
+      break;
+    }
     pid_t child_pid = fork();
     if (child_pid >= 0) {
       // successful fork
       active_child_processes += 1;
       if (child_pid == 0) {
+        if (timeout_expired) {
+          printf("Child proccess terminated due to timeout\n");
+          exit(0);
+        }
         // child process
         struct MinMax min_max;
         printf("New pipe\n");
@@ -137,6 +170,7 @@ int main(int argc, char **argv) {
         } else {
           write(fd[i][1], &min_max.min, sizeof(int));
           write(fd[i][1], &min_max.max, sizeof(int));
+          close(fd[i][0]);
           close(fd[i][1]);
         }
         return 0;
@@ -154,8 +188,21 @@ int main(int argc, char **argv) {
   }
 
   while (active_child_processes > 0) {
-    wait(NULL);
-    active_child_processes -= 1;
+    if (timeout_expired) {
+      printf("Killing child proccesses due to timeout.\n");
+      for (int i = 0; i < pnum; i++) {
+        if (child_pids[i] > 0) {
+          kill(child_pids[i], SIGKILL);
+        }
+      }
+      fflush(NULL);
+      free(child_pids);
+      return 0;
+    }
+    int status;
+    pid_t state = waitpid(-1, &status, WNOHANG);
+    if (state > 0)
+      active_child_processes -= 1;
   }
 
   struct MinMax min_max;
@@ -191,5 +238,7 @@ int main(int argc, char **argv) {
   printf("Max: %d\n", min_max.max);
   printf("Elapsed time: %fms\n", elapsed_time);
   fflush(NULL);
+  free(child_pids);
+
   return 0;
 }
