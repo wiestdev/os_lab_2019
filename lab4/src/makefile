@@ -1,13 +1,19 @@
 CC=gcc
 CFLAGS=-I.
 
-all : parallel_min_max zombie
+all : parallel_min_max zombie parallel_sum
 
 zombie :
 	$(CC) -o zombie zombie.c $(CFLAGS)
 
 parallel_min_max : utils.o find_min_max.o utils.h find_min_max.h
 	$(CC) -o parallel_min_max utils.o find_min_max.o parallel_min_max.c $(CFLAGS)
+
+parallel_sum : utils.o sum.o utils.h sum.h
+	$(CC) -o parallel_sum utils.o sum.o parallel_sum.c -pthread $(CFLAGS)
+
+sum.o : sum.h
+	$(CC) -o sum.o -c sum.c $(CFLAGS)
 
 utils.o : utils.h
 	$(CC) -o utils.o -c utils.c $(CFLAGS)
@@ -17,4 +23,4 @@ find_min_max.o : utils.h find_min_max.h
 
 
 clean :
-	rm utils.o find_min_max.o parallel_min_max zombie
+	rm utils.o find_min_max.o sum.o parallel_min_max zombie parallel_sum
