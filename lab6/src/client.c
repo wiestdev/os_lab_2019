@@ -36,11 +36,10 @@ bool ConvertStringToUI64(const char *str, uint64_t *val) {
 int main(int argc, char **argv) {
   uint64_t k = -1;
   uint64_t mod = -1;
-  char servers[255] = {'\0'}; // TODO: explain why 255
+  char server_filename[255] = {'\0'}; // TODO: explain why 255
 
   while (true) {
     int current_optind = optind ? optind : 1;
-
     static struct option options[] = {{"k", required_argument, 0, 0},
                                       {"mod", required_argument, 0, 0},
                                       {"servers", required_argument, 0, 0},
@@ -71,7 +70,7 @@ int main(int argc, char **argv) {
         break;
       case 2:
         // TODO: your code here
-        memcpy(servers, optarg, strlen(optarg));
+        strncpy(server_filename, optarg, strlen(optarg));
         break;
       default:
         printf("Index %d is out of options\n", option_index);
@@ -86,21 +85,42 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (k == -1 || mod == -1 || !strlen(servers)) {
+  if (k == -1 || mod == -1 || !strlen(server_filename)) {
     fprintf(stderr, "Using: %s --k 1000 --mod 5 --servers /path/to/file\n",
             argv[0]);
     return 1;
   }
 
+  FILE *file = fopen(server_filename, "r");
+  if (file == NULL) {
+    printf("Opening servers file error");
+    return 1;
+  }
   // TODO: for one server here, rewrite with servers from file
-  unsigned int servers_num = 1;
-  struct Server *to = malloc(sizeof(struct Server) * servers_num);
+  size_t line_size = 255;
+  char line[line_size];
+  int server_num;
+  for (server_num = 0; fgets(line, line_size, file); server_num++) {
+
+  }
+  rewind(file);
+
+  struct Server *servers = malloc(sizeof(struct Server) * server_num);
+  for (int i = 0; i < server_num; i++) {
+    if (fgets(line), sizeof(line), file) {
+      sscanf(line, "%[^:]:%d", servers[i].ip, &servers[i].port);
+    }
+  }
+
+  fclose(file);
+
+  //struct Server *to = malloc(sizeof(struct Server) * servers_num);
   // TODO: delete this and parallel work between servers
-  to[0].port = 20001;
-  memcpy(to[0].ip, "127.0.0.1", sizeof("127.0.0.1"));
+  //to[0].port = 20001;
+  //memcpy(to[0].ip, "127.0.0.1", sizeof("127.0.0.1"));
 
   // TODO: work continiously, rewrite to make parallel
-  for (int i = 0; i < servers_num; i++) {
+  for (int i = 0; i < server_num; i++) {
     struct hostent *hostname = gethostbyname(to[i].ip);
     if (hostname == NULL) {
       fprintf(stderr, "gethostbyname failed with %s\n", to[i].ip);
