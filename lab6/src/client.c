@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
 
   struct Server *servers = malloc(sizeof(struct Server) * server_num);
   for (int i = 0; i < server_num; i++) {
-    if (fgets(line), sizeof(line), file) {
+    if (fgets(line, sizeof(line), file)) {
       sscanf(line, "%[^:]:%d", servers[i].ip, &servers[i].port);
     }
   }
@@ -120,59 +120,86 @@ int main(int argc, char **argv) {
   //memcpy(to[0].ip, "127.0.0.1", sizeof("127.0.0.1"));
 
   // TODO: work continiously, rewrite to make parallel
+
+  int pipes[server_num][2];
+  int child_processes = 0;
   for (int i = 0; i < server_num; i++) {
-    struct hostent *hostname = gethostbyname(to[i].ip);
-    if (hostname == NULL) {
-      fprintf(stderr, "gethostbyname failed with %s\n", to[i].ip);
-      exit(1);
+    if (pipe(pipes[i]) == -1) {
+      printf("Pipe error");
+      return 1;
     }
+    pid_t pid = fork();
+    if (pid >= 0) {
+      child_processes++;
+      if (pid == 0) {
+        close(pipes[i][0]);
+        struct hostent *hostname = gethostbyname(servers[i].ip);
+        if (hostname == NULL) {
+          fprintf(stderr, "gethostbyname failed with %s\n", servers[i].ip);
+          return 1;
+        }
+        struct sockaddr_in server;
+        server.sin_family = AF_INET;
+        printf("%d\n", *((unsigned long *)hostname->h_addr_list[0]));
+        server.sin_port = htons(servers[i].port);
+        server.sin_addr.s_addr = *((unsigned long *)hostname->h_addr_list[0]);
 
-    struct sockaddr_in server;
-    server.sin_family = AF_INET;
-    server.sin_port = htons(to[i].port);
-    server.sin_addr.s_addr = *((unsigned long *)hostname->h_addr);
+        int sck = socket(AF_INET, SOCK_STREAM, 0);
+        if (sck < 0) {
+          fprintf(stderr, "Socket creation failed!\n");
+          exit(1);
+        }
+        if (connect(sck, (struct sockaddr *)&server, sizeof(server)) < 0) {
+          fprintf(stderr, "Connection failed\n");
+          exit(1);
+        }
+        // TODO: for one server
+        // parallel between servers
+        uint64_t begin = i * k / server_num + 1;
+        uint64_t end = (i + 1) * k / server_num + 1;
+        char task[sizeof(uint64_t) * 3];
+        memcpy(task, &begin, sizeof(uint64_t));
+        memcpy(task + sizeof(uint64_t), &end, sizeof(uint64_t));
+        memcpy(task + 2 * sizeof(uint64_t), &mod, sizeof(uint64_t));
 
-    int sck = socket(AF_INET, SOCK_STREAM, 0);
-    if (sck < 0) {
-      fprintf(stderr, "Socket creation failed!\n");
-      exit(1);
+        if (send(sck, task, sizeof(task), 0) < 0) {
+          fprintf(stderr, "Send failed\n");
+          exit(1);
+        }
+        char response[sizeof(uint64_t)];
+        if (recv(sck, response, sizeof(response), 0) < 0) {
+          fprintf(stderr, "Receive failed\n");
+          exit(1);
+        }
+        uint64_t answer = 0;
+        memcpy(&answer, response, sizeof(uint64_t));
+        write(pipes[i][1], &answer, sizeof(answer)); // Отправить ответ в родительский процесс
+        close(pipes[i][1]);
+        close(sck);
+        exit(0);
+      }
+      else {
+        close(pipes[i][1]); // Закрыть запись в родительском процессе
+      }
+    } else {
+      printf("Fork failed!\n");
+      return 1;
     }
-
-    if (connect(sck, (struct sockaddr *)&server, sizeof(server)) < 0) {
-      fprintf(stderr, "Connection failed\n");
-      exit(1);
-    }
-
-    // TODO: for one server
-    // parallel between servers
-    uint64_t begin = 1;
-    uint64_t end = k;
-
-    char task[sizeof(uint64_t) * 3];
-    memcpy(task, &begin, sizeof(uint64_t));
-    memcpy(task + sizeof(uint64_t), &end, sizeof(uint64_t));
-    memcpy(task + 2 * sizeof(uint64_t), &mod, sizeof(uint64_t));
-
-    if (send(sck, task, sizeof(task), 0) < 0) {
-      fprintf(stderr, "Send failed\n");
-      exit(1);
-    }
-
-    char response[sizeof(uint64_t)];
-    if (recv(sck, response, sizeof(response), 0) < 0) {
-      fprintf(stderr, "Recieve failed\n");
-      exit(1);
-    }
-
-    // TODO: from one server
-    // unite results
-    uint64_t answer = 0;
-    memcpy(&answer, response, sizeof(uint64_t));
-    printf("answer: %llu\n", answer);
-
-    close(sck);
   }
-  free(to);
+  uint64_t answerall = 1;
+  for (int i = 0; i < server_num; i++) {
+    printf("228");
+    uint64_t answer = 0;
+    read(pipes[i][0], &answer, sizeof(answer)); // Чтение ответа от дочернего процесса
+    answerall = (answerall * answer) % mod; // Объединение результатов
+    close(pipes[i][0]);
+  }
+  printf("answerall: %lu\n", answerall);
+  while (child_processes > 0) {
+    wait(NULL);
+    child_processes--;
+  }
 
+  free(servers);
   return 0;
 }
