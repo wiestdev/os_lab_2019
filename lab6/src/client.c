@@ -36,7 +36,7 @@ bool ConvertStringToUI64(const char *str, uint64_t *val) {
 int main(int argc, char **argv) {
   uint64_t k = -1;
   uint64_t mod = -1;
-  char server_filename[255] = {'\0'}; // TODO: explain why 255
+  char server_filename[255] = {'\0'};
 
   while (true) {
     int current_optind = optind ? optind : 1;
@@ -172,13 +172,13 @@ int main(int argc, char **argv) {
         }
         uint64_t answer = 0;
         memcpy(&answer, response, sizeof(uint64_t));
-        write(pipes[i][1], &answer, sizeof(answer)); // Отправить ответ в родительский процесс
+        write(pipes[i][1], &answer, sizeof(answer));
         close(pipes[i][1]);
         close(sck);
         exit(0);
       }
       else {
-        close(pipes[i][1]); // Закрыть запись в родительском процессе
+        close(pipes[i][1]);
       }
     } else {
       printf("Fork failed!\n");
@@ -188,8 +188,8 @@ int main(int argc, char **argv) {
   uint64_t answerall = 1;
   for (int i = 0; i < server_num; i++) {
     uint64_t answer = 0;
-    read(pipes[i][0], &answer, sizeof(answer)); // Чтение ответа от дочернего процесса
-    answerall = (answerall * answer) % mod; // Объединение результатов
+    read(pipes[i][0], &answer, sizeof(answer));
+    answerall = (answerall * answer) % mod;
     close(pipes[i][0]);
   }
   printf("answerall: %lu\n", answerall);
