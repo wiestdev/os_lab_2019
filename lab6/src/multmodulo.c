@@ -1,4 +1,5 @@
 #include "multmodulo.h"
+#include <stdio.h>
 
 uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
   uint64_t result = 0;

@@ -140,7 +140,6 @@ int main(int argc, char **argv) {
         }
         struct sockaddr_in server;
         server.sin_family = AF_INET;
-        printf("%d\n", *((unsigned long *)hostname->h_addr_list[0]));
         server.sin_port = htons(servers[i].port);
         server.sin_addr.s_addr = *((unsigned long *)hostname->h_addr_list[0]);
 
@@ -188,7 +187,6 @@ int main(int argc, char **argv) {
   }
   uint64_t answerall = 1;
   for (int i = 0; i < server_num; i++) {
-    printf("228");
     uint64_t answer = 0;
     read(pipes[i][0], &answer, sizeof(answer)); // Чтение ответа от дочернего процесса
     answerall = (answerall * answer) % mod; // Объединение результатов

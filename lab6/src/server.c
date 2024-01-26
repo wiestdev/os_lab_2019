@@ -61,7 +61,8 @@ int main(int argc, char **argv) {
         }
         break;
       case 1:
-        tnum = atoi(optarg);
+        //tnum = atoi(optarg);
+        tnum = 1;
         if (tnum <= 0) {
           printf("tnum must be > 0\n");
           return 1;
@@ -153,8 +154,8 @@ int main(int argc, char **argv) {
       struct FactorialArgs args[tnum];
       for (uint32_t i = 0; i < tnum; i++) {
         // TODO: parallel somehow
-        args[i].begin = 1;
-        args[i].end = 1;
+        args[i].begin = begin;
+        args[i].end = end;
         args[i].mod = mod;
 
         if (pthread_create(&threads[i], NULL, ThreadFactorial,
