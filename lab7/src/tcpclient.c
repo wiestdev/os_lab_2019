@@ -7,19 +7,20 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define BUFSIZE 100
+//define BUFSIZE 100
 #define SADDR struct sockaddr
 #define SIZE sizeof(struct sockaddr_in)
 
 int main(int argc, char *argv[]) {
-  int fd;
-  int nread;
-  char buf[BUFSIZE];
-  struct sockaddr_in servaddr;
   if (argc < 3) {
-    printf("Too few arguments \n");
+    printf("Usage: %s <server_addr> <port> <buffer_size>\n", argv[0]);
     exit(1);
   }
+  int buffer_size = atoi(argv[3]);
+  int fd;
+  int nread;
+  char buf[buffer_size];
+  struct sockaddr_in servaddr;
 
   if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     perror("socket creating");
@@ -42,7 +43,7 @@ int main(int argc, char *argv[]) {
   }
 
   write(1, "Input message to send\n", 22);
-  while ((nread = read(0, buf, BUFSIZE)) > 0) {
+  while ((nread = read(0, buf, buffer_size)) > 0) {
     if (write(fd, buf, nread) < 0) {
       perror("write");
       exit(1);
